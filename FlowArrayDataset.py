@@ -55,6 +55,7 @@ class FlowArrayDataset(Randomizable, _TorchDataset):
         inputZ04: Sequence,
         inputZ05: Sequence,
         inputZ06: Sequence,
+        inputZ07: Sequence,
         targetC01: Sequence,
         targetC02: Sequence,
         targetC03: Sequence,
@@ -64,6 +65,7 @@ class FlowArrayDataset(Randomizable, _TorchDataset):
         inputZ04_transform: Optional[Callable] = None,
         inputZ05_transform: Optional[Callable] = None,
         inputZ06_transform: Optional[Callable] = None,
+        inputZ07_transform: Optional[Callable] = None,
         targetC01_transform: Optional[Callable] = None,
         targetC02_transform: Optional[Callable] = None,
         targetC03_transform: Optional[Callable] = None
@@ -76,6 +78,7 @@ class FlowArrayDataset(Randomizable, _TorchDataset):
 
         items = [(inputZ01, inputZ01_transform), (inputZ02, inputZ02_transform), (inputZ03, inputZ03_transform),
                  (inputZ04, inputZ04_transform), (inputZ05, inputZ05_transform), (inputZ06, inputZ06_transform),
+                 (inputZ07, inputZ07_transform),
                  (targetC01, targetC01_transform), (targetC02, targetC02_transform), (targetC03, targetC03_transform)]
         self.set_random_state(seed=get_seed())
         datasets = [Dataset(x[0], x[1]) for x in items if x[0] is not None]

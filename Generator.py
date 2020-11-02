@@ -86,18 +86,18 @@ class GeneratorUnet(nn.Module):
         super(GeneratorUnet, self).__init__()
         factor = 2
 
-        self.inc = DoubleConv(1, 64)  # 1 or 3
-        self.down1 = Down(64, 128)
-        self.down2 = Down(128, 256)
-        self.down3 = Down(256, 512)
-        self.down4 = Down(512, 1024 // factor)
-        self.up1 = Up(1024, 512 // factor)
-        self.up2 = Up(512, 256 // factor)
-        self.up3 = Up(256, 128 // factor)
-        self.up4 = Up(128, 64)
-        self.outc = OutConv(64, 1)
+        self.inc = DoubleConv(1, 32)  # 1 or 3
+        self.down1 = Down(32*7, 64*7)
+        self.down2 = Down(64*7, 128*7)
+        self.down3 = Down(128*7, 256*7)
+        self.down4 = Down(256*7, 512*7 // factor)
+        self.up1 = Up(512*7, 256*7 // factor)
+        self.up2 = Up(256*7, 128*7 // factor)
+        self.up3 = Up(128*7, 64*7 // factor)
+        self.up4 = Up(64*7, 32*7)
+        self.outc = OutConv(32*7, 1)
 
-    def forward(self, input1, input2, input3, input4, input5, input6):
+    def forward(self, input1, input2, input3, input4, input5, input6, input7):
         # Idea of computing multi-input-multi-output from Ferdian et al (4DflowNET)
         # convolve each input respectively (6 x1s)
         inc1 = self.inc(input1)
@@ -106,18 +106,30 @@ class GeneratorUnet(nn.Module):
         inc4 = self.inc(input4)
         inc5 = self.inc(input5)
         inc6 = self.inc(input6)
+        inc7 = self.inc(input7)
+        print('inc :' + str(inc1.size()))
         # now concat 6 inputs
-        x_concat = torch.cat((inc1, inc2, inc3, inc4, inc5, inc6), dim=1)
+        x_concat = torch.cat((inc1, inc2, inc3, inc4, inc5, inc6, inc7), dim=1)
+        print('concat :' + str(x_concat.size()))
         x2 = self.down1(x_concat)
+        print('x2 :' + str(x2.size()))
         x3 = self.down2(x2)
+        print('x3 :' + str(x2.size()))
         x4 = self.down3(x3)
+        print('x4 :' + str(x2.size()))
         x5 = self.down4(x4)
+        print('x5 :' + str(x2.size()))
         x = self.up1(x5, x4)
+        print('up1 :' + str(x.size()))
         x = self.up2(x, x3)
+        print('up2 :' + str(x.size()))
         x = self.up3(x, x2)
+        print('up3 :' + str(x.size()))
         x = self.up4(x, x_concat)
+        print('up4:' + str(x.size()))
         # now multi ouput for 3 channels respectively
         out1 = self.outc(x)
+        print('out1 :' + str(out1.size()))
         out2 = self.outc(x)
         out3 = self.outc(x)
 

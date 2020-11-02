@@ -11,10 +11,11 @@ import torch
 import torch.optim as optim
 import torch.utils.data
 from torch.utils.tensorboard import SummaryWriter
+from torch import autograd
 
 from torchio.transforms import CropOrPad
-from monai.data import ArrayDataset, DataLoader
-from monai.transforms import Compose, LoadImage, AddChannel, RandFlip, RandRotate, RandRotate90, RandScaleIntensity, CenterSpatialCrop, ToTensor
+from monai.data import ArrayDataset, DataLoader, PILReader
+from monai.transforms import Compose, LoadImage, AddChannel, RandFlip, RandRotate, RandRotate90, RandScaleIntensity, CenterSpatialCrop, ToTensor, ScaleIntensity, LoadPNG
 from monai.visualize import plot_2d_or_3d_image
 
 import FlowArrayDataset
@@ -32,7 +33,7 @@ parser.add_argument('--batch_size', default=2, type=int, help='batch size')
 parser.add_argument('--mode', default='VGG', type=str,
                     help='MSE for MSE as a content loss or VGG for pretrained vgg19 as a content loss')
 parser.add_argument('--aug_prob', default=15, type=int, help='augmentation probability')
-parser.add_argument('--data_dir', default='./images/*/*', type=str) #'./images/*/*'
+parser.add_argument('--data_dir', default='./images/20x_images/*', type=str) #'./images/*/*'
 parser.add_argument('--load_weight_dir', default=None, type=str,
                     help='if you want to continue training load the checkpoint, otherwise set to None')
 parser.add_argument('--save_weight_dir', default='./checkpoints/tempcheckpoint',
@@ -70,6 +71,7 @@ if __name__ == '__main__':
     inputZ04_path = sorted(glob.glob(os.path.join(data_dir, '*A04Z04*.tif'), recursive=True))
     inputZ05_path = sorted(glob.glob(os.path.join(data_dir, '*A04Z05*.tif'), recursive=True))
     inputZ06_path = sorted(glob.glob(os.path.join(data_dir, '*A04Z06*.tif'), recursive=True))
+    inputZ07_path = sorted(glob.glob(os.path.join(data_dir, '*A04Z07*.tif'), recursive=True))
 
     # 3 output channels
     targetC01_path = sorted(glob.glob(os.path.join(data_dir, '*C01.tif'), recursive=True))
@@ -83,6 +85,7 @@ if __name__ == '__main__':
     inputZ04, inputZ04_val = split_train_val(inputZ04_path)
     inputZ05, inputZ05_val = split_train_val(inputZ05_path)
     inputZ06, inputZ06_val = split_train_val(inputZ06_path)
+    inputZ07, inputZ07_val = split_train_val(inputZ07_path)
 
     targetC01, targetC01_val = split_train_val(targetC01_path)
     targetC02, targetC02_val = split_train_val(targetC02_path)
@@ -91,22 +94,26 @@ if __name__ == '__main__':
     # data preprocessing/augmentation
     trans_train = Compose(
         [
-            LoadImage(image_only=True),
+            #LoadPNG(image_only=True),
+            LoadImage(PILReader(), image_only=True),
             AddChannel(),
             CenterSpatialCrop(roi_size=2154),  # 2154
-            RandRotate(range_x=15, prob=aug_prob, keep_size=True),
-            RandRotate90(prob=aug_prob, spatial_axes=(0, 1)),
-            RandFlip(spatial_axis=0, prob=aug_prob),
-            RandScaleIntensity(factors=0.5, prob=aug_prob),
+            #ScaleIntensity(),
+            #RandRotate(range_x=15, prob=aug_prob, keep_size=True),
+            #RandRotate90(prob=aug_prob, spatial_axes=(0, 1)),
+            #RandFlip(spatial_axis=0, prob=aug_prob),
+            #RandScaleIntensity(factors=0.5, prob=aug_prob)
             ToTensor()
         ]
     )
 
     trans_val = Compose(
         [
-            LoadImage(image_only=True),
+            #LoadPNG(image_only=True),
+            LoadImage(PILReader(), image_only=True),
             AddChannel(),
-            CenterSpatialCrop(roi_size=2154),
+            #CenterSpatialCrop(roi_size=2154),
+            #ScaleIntensity(),
             ToTensor()
         ]
     )
@@ -119,6 +126,7 @@ if __name__ == '__main__':
         inputZ04=inputZ04, inputZ04_transform=trans_train,
         inputZ05=inputZ05, inputZ05_transform=trans_train,
         inputZ06=inputZ06, inputZ06_transform=trans_train,
+        inputZ07=inputZ07, inputZ07_transform=trans_train,
         targetC01=targetC01, targetC01_transform=trans_train,
         targetC02=targetC02, targetC02_transform=trans_train,
         targetC03=targetC03, targetC03_transform=trans_train
@@ -131,6 +139,7 @@ if __name__ == '__main__':
         inputZ04=inputZ04_val, inputZ04_transform=trans_val,
         inputZ05=inputZ05_val, inputZ05_transform=trans_val,
         inputZ06=inputZ06_val, inputZ06_transform=trans_val,
+        inputZ07=inputZ07_val, inputZ07_transform=trans_val,
         targetC01=targetC01_val, targetC01_transform=trans_val,
         targetC02=targetC02_val, targetC02_transform=trans_val,
         targetC03=targetC03_val, targetC03_transform=trans_val
@@ -153,6 +162,7 @@ if __name__ == '__main__':
 
     # load model / criterion / optimizer
     netG = GeneratorUnet().to(device)
+    print(netG)
     netD = Discriminator().to(device)
 
     mseloss = nn.MSELoss()
@@ -173,6 +183,7 @@ if __name__ == '__main__':
     else:
         init_epoch = 0
 
+
     # pre-train generator only
     if num_epochs_G is not None:
         print(f'pre-training Generator for {num_epochs_G} epochs')
@@ -182,17 +193,19 @@ if __name__ == '__main__':
             netG.train()
 
             for batch_index, batch in enumerate(tqdm(training_loader)):
-                inputZ01, inputZ02, inputZ03, inputZ04, inputZ05, inputZ06 = \
+                inputZ01, inputZ02, inputZ03, inputZ04, inputZ05, inputZ06, inputZ07 = \
                     batch[0].to(device), batch[1].to(device), batch[2].to(device), \
-                    batch[3].to(device), batch[4].to(device), batch[5].to(device)
-                targetC01, targetC02, targetC03 = batch[6].to(device), batch[7].to(device), batch[8].to(device)
+                    batch[3].to(device), batch[4].to(device), batch[5].to(device), batch[6].to(device)
+                targetC01, targetC02, targetC03 = batch[7].to(device), batch[8].to(device), batch[9].to(device)
 
                 print('input size :' + str(inputZ01.size()))
                 print('target size :' + str(targetC01.size()))
 
                 netG.zero_grad()
 
-                outputC01, outputC02, outputC03 = netG(inputZ01, inputZ02, inputZ03, inputZ04, inputZ05, inputZ06)
+                outputC01, outputC02, outputC03 = netG(inputZ01, inputZ02, inputZ03, inputZ04, inputZ05, inputZ06, inputZ07)
+
+                # with autograd.detect_anomaly():
                 loss01 = mseloss(outputC01, targetC01)
                 loss02 = mseloss(outputC01, targetC01)
                 loss03 = mseloss(outputC01, targetC01)
@@ -250,7 +263,9 @@ if __name__ == '__main__':
             realC02_prob = netD(targetC02)
             realC03_prob = netD(targetC03)
 
-            outputC01, outputC02, outputC03 = netG(inputZ01, inputZ02, inputZ03, inputZ04, inputZ05, inputZ06)
+            # torch.cat((targetC01, targetC02, targetC03), dim=1) and pass it to disc
+
+            outputC01, outputC02, outputC03 = netG(inputZ01, inputZ02, inputZ03, inputZ04, inputZ05, inputZ06, inputZ07)
             fakeC01_prob = netD(outputC01)
             fakeC02_prob = netD(outputC02)
             fakeC03_prob = netD(outputC03)
@@ -272,7 +287,7 @@ if __name__ == '__main__':
             #################################################################
             netG.zero_grad()
 
-            outputC01, outputC02, outputC03 = netG(inputZ01, inputZ02, inputZ03, inputZ04, inputZ05, inputZ06)
+            outputC01, outputC02, outputC03 = netG(inputZ01, inputZ02, inputZ03, inputZ04, inputZ05, inputZ06, inputZ07)
 
             if mode == 'MSE':
                 content_loss = mseloss(outputC01, targetC01) + mseloss(outputC02, targetC02) + mseloss(outputC03, targetC03)
@@ -280,6 +295,8 @@ if __name__ == '__main__':
                 content_loss = vggloss(outputC01, targetC01) + vggloss(outputC02, targetC02) + vggloss(outputC03, targetC03)
 
             adversarial_loss = bceloss(netD(outputC01), real_label) + bceloss(netD(outputC02), real_label) + bceloss(netD(outputC03), real_label)
+            # can try bce loss on bceloss(outputC1-3, targetC1-3)
+
             g_loss = content_loss + 1e-3 * adversarial_loss
 
             g_loss.backward()
