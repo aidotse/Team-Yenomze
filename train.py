@@ -26,14 +26,14 @@ from Generator import *
 from Discriminator import *
 
 parser = argparse.ArgumentParser(description='Train')
-parser.add_argument('--num_epochs_G', default=10, type=int,
+parser.add_argument('--num_epochs_G', default=5, type=int,
                     help='number of epochs to pre-train generator, otherwise set to None')
 parser.add_argument('--num_epochs', default=10, type=int, help='number of epochs')
 parser.add_argument('--batch_size', default=2, type=int, help='batch size')
-parser.add_argument('--mode', default='VGG', type=str,
+parser.add_argument('--mode', default='MSE', type=str,
                     help='MSE for MSE as a content loss or VGG for pretrained vgg19 as a content loss')
 parser.add_argument('--aug_prob', default=15, type=int, help='augmentation probability')
-parser.add_argument('--data_dir', default='./images/20x_images/*', type=str) #'./images/*/*'
+parser.add_argument('--data_dir', default='./images/*/*', type=str) #'./images/*/*'
 parser.add_argument('--load_weight_dir', default=None, type=str,
                     help='if you want to continue training load the checkpoint, otherwise set to None')
 parser.add_argument('--save_weight_dir', default='./checkpoints/tempcheckpoint',
@@ -102,7 +102,7 @@ if __name__ == '__main__':
             #LoadPNG(image_only=True),
             LoadImage(PILReader(), image_only=True),
             AddChannel(),
-            CenterSpatialCrop(roi_size=2154),  # 2154
+            CenterSpatialCrop(roi_size=32),  # 2154
             #ScaleIntensity(),
             #RandRotate(range_x=15, prob=aug_prob, keep_size=True),
             #RandRotate90(prob=aug_prob, spatial_axes=(0, 1)),
@@ -117,6 +117,7 @@ if __name__ == '__main__':
             #LoadPNG(image_only=True),
             LoadImage(PILReader(), image_only=True),
             AddChannel(),
+            CenterSpatialCrop(roi_size=32),
             #CenterSpatialCrop(roi_size=2154),
             #ScaleIntensity(),
             ToTensor()
@@ -237,13 +238,17 @@ if __name__ == '__main__':
             epoch_lossC02 = np.array(lossC02s).mean()
             epoch_lossC03 = np.array(lossC03s).mean()
 
-            print(f'Pre-training Generator - Epoch {epoch}/{num_epochs} loss: {epoch_loss}, loss01: {epoch_lossC01}, loss02: {epoch_lossC02}, loss03: {epoch_lossC03}')
+            print(f'Pre-training Generator - Epoch {epoch}/{num_epochs_G} loss: {epoch_loss}, loss01: {epoch_lossC01}, loss02: {epoch_lossC02}, loss03: {epoch_lossC03}')
             save_gene = save_gene.append({'TotalLoss': epoch_loss, 'lossC01': epoch_lossC01, 'lossC02': epoch_lossC02, 'lossC03': epoch_lossC03}, ignore_index=True)
             save_gene.to_csv(os.path.join(loss_dir, 'generator_loss_info.csv'))
 
             # save model parameters
             weight = f'pretrained_G_epoch_{epoch}.pth'
             torch.save(netG.state_dict(), os.path.join(save_weight_dir, weight))
+            torch.save({'epoch': epoch,
+                        'model_state_dict': netG.state_dict(),
+                        'optimizer_state_dict': optimizerG.state_dict(),
+                        'loss': epoch_loss}, os.path.join(save_weight_dir, weight))
 
     if num_epochs_G is not None:
         init_epoch = num_epochs_G + 1
@@ -252,7 +257,20 @@ if __name__ == '__main__':
         init_epoch = 1
         num_epochs = num_epochs
 
-    # train GAN
+    #############
+    # train GAN #
+    #############
+
+    if num_epochs_G is not None:
+        print(f'Loading weights from pretrained generator')
+        finalweight = f'pretrained_G_epoch_{num_epochs_G}.pth'
+        checkpoint = torch.load(os.path.join(save_weight_dir, finalweight))
+        netG.load_state_dict(checkpoint['model_state_dict'])
+        optimizerG.load_state_dict(checkpoint['optimizer_state_dict'])
+        init_epoch = checkpoint['epoch']
+        loss = checkpoint['loss']
+    else:
+        pass
 
     real_label = torch.ones((batch_size, 1)).to(device)
     fake_label = torch.zeros((batch_size, 1)).to(device)
@@ -383,7 +401,7 @@ if __name__ == '__main__':
                     batch[3].to(device), batch[4].to(device), batch[5].to(device)
                 targetC01, targetC02, targetC03 = batch[6].to(device), batch[7].to(device), batch[8].to(device)
 
-                outputC01, outputC02, outputC03 = netG(inputZ01, inputZ02, inputZ03, inputZ04, inputZ05, inputZ06)
+                outputC01, outputC02, outputC03 = netG(inputZ01, inputZ02, inputZ03, inputZ04, inputZ05, inputZ06, inputZ07)
 
                 if mode == 'MSE':
                     lossC01 = mseloss(outputC01, targetC01)
