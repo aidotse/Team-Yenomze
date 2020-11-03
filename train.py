@@ -272,8 +272,6 @@ if __name__ == '__main__':
     else:
         pass
 
-    real_label = torch.ones((batch_size, 1)).to(device)
-    fake_label = torch.zeros((batch_size, 1)).to(device)
     # OR....use Label smoothing
     # real_label = torch.tensor(torch.rand(real_prob.size()) * 0.25 + 0.85)
     # fake_label = torch.tensor(torch.rand(fake_prob.size()) * 0.15)
@@ -293,10 +291,14 @@ if __name__ == '__main__':
         lossC03s = []
 
         for batch_index, batch in enumerate(tqdm(training_loader)):
-            inputZ01, inputZ02, inputZ03, inputZ04, inputZ05, inputZ06 = \
+            inputZ01, inputZ02, inputZ03, inputZ04, inputZ05, inputZ06, inputZ07 = \
                 batch[0].to(device), batch[1].to(device), batch[2].to(device),\
-                batch[3].to(device), batch[4].to(device), batch[5].to(device)
-            targetC01, targetC02, targetC03 = batch[6].to(device), batch[7].to(device), batch[8].to(device)
+                batch[3].to(device), batch[4].to(device), batch[5].to(device), batch[6].to(device)
+            targetC01, targetC02, targetC03 = batch[7].to(device), batch[8].to(device), batch[9].to(device)
+
+            shape = inputZ01.size()
+            real_label = torch.ones((shape[0])).to(device)
+            fake_label = torch.zeros((shape[0])).to(device)
 
             ###############################################################
             # First train discriminator network : maximize D(x)-1-D(G(z)) #
@@ -316,7 +318,7 @@ if __name__ == '__main__':
             fakeC03_prob = netD(outputC03)
 
             d_loss_real = bceloss(realC01_prob, real_label) + bceloss(realC02_prob, real_label) + bceloss(realC03_prob, real_label)
-            d_loss_fake = bceloss(fakeC01_prob, fake_label) + bceloss(fakeC02_prob, fake_label) + bceloss(fakeC02_prob, fake_label)
+            d_loss_fake = bceloss(fakeC01_prob, fake_label) + bceloss(fakeC02_prob, fake_label) + bceloss(fakeC03_prob, fake_label)
 
             d_loss = d_loss_real + d_loss_fake
 
@@ -396,10 +398,14 @@ if __name__ == '__main__':
         with torch.no_grad():
             val_bar = tqdm(validation_loader)
             for batch_index, batch in enumerate(tqdm(training_loader)):
-                inputZ01, inputZ02, inputZ03, inputZ04, inputZ05, inputZ06 = \
+                inputZ01, inputZ02, inputZ03, inputZ04, inputZ05, inputZ06, inputZ07 = \
                     batch[0].to(device), batch[1].to(device), batch[2].to(device), \
-                    batch[3].to(device), batch[4].to(device), batch[5].to(device)
-                targetC01, targetC02, targetC03 = batch[6].to(device), batch[7].to(device), batch[8].to(device)
+                    batch[3].to(device), batch[4].to(device), batch[5].to(device), batch[6].to(device)
+                targetC01, targetC02, targetC03 = batch[7].to(device), batch[8].to(device), batch[9].to(device)
+
+                shape = inputZ01.size()
+                real_label = torch.ones((shape[0])).to(device)
+                fake_label = torch.zeros((shape[0])).to(device)
 
                 outputC01, outputC02, outputC03 = netG(inputZ01, inputZ02, inputZ03, inputZ04, inputZ05, inputZ06, inputZ07)
 
