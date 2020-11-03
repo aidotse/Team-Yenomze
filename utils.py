@@ -5,7 +5,7 @@ def split_train_val(data_list):
     data_train = data_list[:split_point]
     data_val = data_list[split_point:]
 
-    return data_val, data_val
+    return data_train, data_val
 
 
 class TrainCompose(Compose):

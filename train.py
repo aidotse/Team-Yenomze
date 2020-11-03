@@ -1,7 +1,7 @@
 import argparse
 import os
 
-from monai.utils import first
+import pandas as pd
 from tqdm import tqdm
 import numpy as np
 import glob
@@ -40,6 +40,8 @@ parser.add_argument('--save_weight_dir', default='./checkpoints/tempcheckpoint',
                     type=str, help='directory where training weightes are saved')
 parser.add_argument('--log_dir', default='./logs/templog',
                     type=str, help='directory where tensorboard logs are saved')
+parser.add_argument('--save_loss_dir', default='./lossinfo/templossinfo',
+                    type=str, help='directory for loss information')
 
 if __name__ == '__main__':
     arg = parser.parse_args()
@@ -53,11 +55,14 @@ if __name__ == '__main__':
     load_weight_dir = arg.load_weight_dir
     save_weight_dir = arg.save_weight_dir
     log_dir = arg.log_dir
+    loss_dir = arg.save_loss_dir
 
     if not os.path.exists(save_weight_dir):
         os.makedirs(save_weight_dir)
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
+    if not os.path.exists(loss_dir):
+        os.makedirs(loss_dir)
 
     device = torch.device('cuda') if torch.cuda.is_available() else 'cpu'
     print('using GPU? : ', torch.cuda.is_available())
@@ -184,12 +189,20 @@ if __name__ == '__main__':
         init_epoch = 0
 
 
-    # pre-train generator only
+    ############################
+    # pre-train generator only #
+    ############################
+
     if num_epochs_G is not None:
         print(f'pre-training Generator for {num_epochs_G} epochs')
+        save_gene = pd.DataFrame(columns=['TotalLoss', 'lossC01', 'lossC02', 'lossC03'])
 
         for epoch in range(1, num_epochs_G + 1):
             pretrainedG_losses = []
+            lossC01s = []
+            lossC02s = []
+            lossC03s = []
+
             netG.train()
 
             for batch_index, batch in enumerate(tqdm(training_loader)):
@@ -215,11 +228,18 @@ if __name__ == '__main__':
                 optimizerG.step()
 
                 pretrainedG_losses.append(loss_gene.item())
+                lossC01s.append(loss01.item())
+                lossC02s.append(loss02.item())
+                lossC03s.append(loss03.item())
 
-            epoch_losses = np.array(pretrainedG_losses)
-            epoch_loss = epoch_losses.mean()
+            epoch_loss = np.array(pretrainedG_losses).mean()
+            epoch_lossC01 = np.array(lossC01s).mean()
+            epoch_lossC02 = np.array(lossC02s).mean()
+            epoch_lossC03 = np.array(lossC03s).mean()
 
-            print(f'Pre-training Generator - Epoch {epoch}/{num_epochs} loss : {epoch_loss}')
+            print(f'Pre-training Generator - Epoch {epoch}/{num_epochs} loss: {epoch_loss}, loss01: {epoch_lossC01}, loss02: {epoch_lossC02}, loss03: {epoch_lossC03}')
+            save_gene = save_gene.append({'TotalLoss': epoch_loss, 'lossC01': epoch_lossC01, 'lossC02': epoch_lossC02, 'lossC03': epoch_lossC03}, ignore_index=True)
+            save_gene.to_csv(os.path.join(loss_dir, 'generator_loss_info.csv'))
 
             # save model parameters
             weight = f'pretrained_G_epoch_{epoch}.pth'
@@ -241,11 +261,18 @@ if __name__ == '__main__':
     # fake_label = torch.tensor(torch.rand(fake_prob.size()) * 0.15)
 
     print(f'\nnow training GAN')
+    save_gan_train = pd.DataFrame(columns=['TotalLoss', 'lossC01', 'lossC02', 'lossC03'])
+    save_gan_val = pd.DataFrame(columns=['TotalLoss', 'lossC01', 'lossC02', 'lossC03'])
+
     for epoch in range(init_epoch, num_epochs + 1):
         print(f'\nEpoch : [{epoch} / {num_epochs}]')
         netG.train()
         G_losses = []
         D_losses = []
+
+        lossC01s = []
+        lossC02s = []
+        lossC03s = []
 
         for batch_index, batch in enumerate(tqdm(training_loader)):
             inputZ01, inputZ02, inputZ03, inputZ04, inputZ05, inputZ06 = \
@@ -290,9 +317,16 @@ if __name__ == '__main__':
             outputC01, outputC02, outputC03 = netG(inputZ01, inputZ02, inputZ03, inputZ04, inputZ05, inputZ06, inputZ07)
 
             if mode == 'MSE':
-                content_loss = mseloss(outputC01, targetC01) + mseloss(outputC02, targetC02) + mseloss(outputC03, targetC03)
+                lossC01 = mseloss(outputC01, targetC01)
+                lossC02 = mseloss(outputC02, targetC02)
+                lossC03 = mseloss(outputC03, targetC03)
+                content_loss = lossC01 + lossC02 + lossC03
+
             if mode == 'VGG':
-                content_loss = vggloss(outputC01, targetC01) + vggloss(outputC02, targetC02) + vggloss(outputC03, targetC03)
+                lossC01 = vggloss(outputC01, targetC01)
+                lossC02 = vggloss(outputC02, targetC02)
+                lossC03 = vggloss(outputC03, targetC03)
+                content_loss = lossC01 + lossC02 + lossC03
 
             adversarial_loss = bceloss(netD(outputC01), real_label) + bceloss(netD(outputC02), real_label) + bceloss(netD(outputC03), real_label)
             # can try bce loss on bceloss(outputC1-3, targetC1-3)
@@ -303,6 +337,10 @@ if __name__ == '__main__':
             optimizerG.step()
 
             G_losses.append(g_loss.item())
+            lossC01s.append(lossC01.item())
+            lossC02s.append(lossC02.item())
+            lossC03s.append(lossC03.item())
+
 
             # log to tensorboard every 10 steps
             if batch_index % 1 == 0:
@@ -317,13 +355,25 @@ if __name__ == '__main__':
 
         G_loss = np.array(G_losses).mean()
         D_loss = np.array(D_losses).mean()
+        epoch_lossC01 = np.array(lossC01s).mean()
+        epoch_lossC02 = np.array(lossC02s).mean()
+        epoch_lossC03 = np.array(lossC03s).mean()
+
+        save_gan_train = save_gan_train.append(
+            {'TotalLoss': G_loss, 'lossC01': epoch_lossC01, 'lossC02': epoch_lossC02, 'lossC03': epoch_lossC03},
+            ignore_index=True)
+        save_gan_train.to_csv(os.path.join(loss_dir, 'gan_train_loss_info.csv'))
 
         print(f'Epoch {epoch}/{num_epochs} Training g_loss : {G_loss}, d_loss : {D_loss}')
 
+        ################################################################################################################
         # Validation
         netG.eval()
 
         val_G_losses = []
+        val_lossC01s = []
+        val_lossC02s = []
+        val_lossC03s = []
 
         with torch.no_grad():
             val_bar = tqdm(validation_loader)
@@ -336,17 +386,26 @@ if __name__ == '__main__':
                 outputC01, outputC02, outputC03 = netG(inputZ01, inputZ02, inputZ03, inputZ04, inputZ05, inputZ06)
 
                 if mode == 'MSE':
-                    content_loss = mseloss(outputC01, targetC01) + mseloss(outputC02, targetC02) + mseloss(outputC03, targetC03)
-                if mode == 'VGG':
-                    content_loss = vggloss(outputC01, targetC01) + vggloss(outputC02, targetC02) + vggloss(outputC03, targetC03)
+                    lossC01 = mseloss(outputC01, targetC01)
+                    lossC02 = mseloss(outputC02, targetC02)
+                    lossC03 = mseloss(outputC03, targetC03)
+                    content_loss = lossC01 + lossC02 + lossC03
 
-                adversarial_loss = bceloss(netD(outputC01), real_label) + \
-                                   bceloss(netD(outputC02), real_label) + \
-                                   bceloss(netD(outputC03), real_label)
+                if mode == 'VGG':
+                    lossC01 = vggloss(outputC01, targetC01)
+                    lossC02 = vggloss(outputC02, targetC02)
+                    lossC03 = vggloss(outputC03, targetC03)
+                    content_loss = lossC01 + lossC02 + lossC03
+
+                adversarial_loss = bceloss(netD(outputC01), real_label) + bceloss(netD(outputC02), real_label) + bceloss(netD(outputC03), real_label)
 
                 val_g_loss = content_loss + 1e-3 * adversarial_loss
 
                 val_G_losses.append(val_g_loss.item())
+                val_lossC01s.append(lossC01.item())
+                val_lossC02s.append(lossC02.item())
+                val_lossC03s.append(lossC03.item())
+
 
                 # log to tensorboard every 10 steps
                 if batch_index % 1 == 0:
@@ -359,6 +418,14 @@ if __name__ == '__main__':
                     plot_2d_or_3d_image(outputC03, epoch * len(training_loader) + batch_index, writer, index=0, tag="Val/C01")
 
         val_G_loss = np.array(val_G_losses).mean()
+        val_epoch_lossC01 = np.array(val_lossC01s).mean()
+        val_epoch_lossC02 = np.array(val_lossC02s).mean()
+        val_epoch_lossC03 = np.array(val_lossC03s).mean()
+
+        save_gan_val = save_gan_val.append(
+            {'TotalLoss': val_G_loss, 'lossC01': val_epoch_lossC01, 'lossC02': val_epoch_lossC02, 'lossC03': val_epoch_lossC03},
+            ignore_index=True)
+        save_gan_val.to_csv(os.path.join(loss_dir, 'gan_val_loss_info.csv'))
 
         print(f'Epoch {epoch}/{num_epochs} Validation g_loss : {val_G_loss}')
 
