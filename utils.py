@@ -12,7 +12,8 @@ class TrainCompose(Compose):
     def __call__(self, input_):
         # load nifti
         vol = self.transforms[0](input_)
-        vol = vol[..., 0]
+        vol = vol / 65535.0
+        #vol = vol[..., 0]
         # add channel
         vol = self.transforms[1](vol)
         # rotation
@@ -20,18 +21,20 @@ class TrainCompose(Compose):
         vol = self.transforms[3](vol)
         # flip
         vol = self.transforms[4](vol)
-        #vol = self.transforms[5](vol)
-        #vol = self.transforms[6](vol)
+        vol = self.transforms[5](vol)
+        vol = self.transforms[6](vol)
         return vol
 
 class ValCompose(Compose):
     def __call__(self, input_):
         # load nifti
         vol = self.transforms[0](input_)
-        vol = vol[..., 0]  # selecting magnitude
+        vol = vol / 65535.0
+        #vol = vol[..., 0]  # selecting magnitude
         # add channel
         vol = self.transforms[1](vol)
         # rotation
         vol = self.transforms[2](vol)
+        vol = self.transforms[3](vol)
         return vol
 
