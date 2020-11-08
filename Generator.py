@@ -35,6 +35,7 @@ class Down(nn.Module):
         self.pool_conv = nn.Sequential(
             # nn.MaxPool2d(2),
             nn.AvgPool2d(kernel_size=3, stride=2),
+            nn.Dropout()
             DoubleConv(in_channels, out_channels)
         )
 
@@ -77,7 +78,8 @@ class OutConv(nn.Module):
 
     def forward(self, x):
         x = self.conv(x)
-        x = (1.0 + self.tanh(x))/2.0
+        x = self.tanh(x)
+        #x = (1.0 + self.tanh(x))/2.0
         return x
 
 
