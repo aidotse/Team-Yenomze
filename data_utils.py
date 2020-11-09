@@ -68,6 +68,23 @@ def preprocess(img, mag_level, channel):
     standardized_img = log_transform_img / max_log_value_dict[channel]
     
     return standardized_img
+
+def postprocess(img, mag_level, channel):
+    std_dict = {"20x": {"C01": 515.0, "C02": 573.0, "C03": 254.0, "C04": 974.0}, 
+                "40x": {"C01": 474.0, "C02": 513.0, "C03": 146.0, "C04": 283.0}, 
+                "60x": {"C01": 379.0, "C02": 1010.0, "C03": 125.0, "C04": 228.0}}
+
+    threshold_99_dict = {"20x": {"C01": 5.47, "C02": 4.08, "C03": 5.95, "C04": 7.28}, 
+                         "40x": {"C01": 5.81, "C02": 3.97, "C03": 6.09, "C04": 7.16}, 
+                         "60x": {"C01": 5.75, "C02": 3.88, "C03": 6.27, "C04": 6.81}}
+    
+    max_log_value_dict = {"C01": 1.92, "C02": 1.63, "C03": 1.99, "C04": 2.12}
+    
+    log_transform_img = img * max_log_value_dict[channel]
+    normalized_img = np.exp(log_transform_img - 1)
+    final_img = normalized_img * std_dict[mag_level][channel]
+    
+    return final_img
     
 
 class OurDataset(_TorchDataset):
@@ -114,10 +131,10 @@ class OurDataset(_TorchDataset):
         patch = patches[patch_id]
         if self.transform is not None:
             # Preprocessing - 1,10,256,256
-            patch[0][7,:,:] = preprocess(patch[0,7,:,:], mag_level, "C01")
-            patch[0][8,:,:] = preprocess(patch[0,8,:,:], mag_level, "C02")
-            patch[0][9,:,:] = preprocess(patch[0,9,:,:], mag_level, "C03")
-            patch[0][:7,:,:] = preprocess(patch[0,:7,:,:], mag_level, "C04")
+            patch[0,7,:,:] = preprocess(patch[0,7,:,:], mag_level, "C01")
+            patch[0,8,:,:] = preprocess(patch[0,8,:,:], mag_level, "C02")
+            patch[0,9,:,:] = preprocess(patch[0,9,:,:], mag_level, "C03")
+            patch[0,:7,:,:] = preprocess(patch[0,:7,:,:], mag_level, "C04")
             
             patch = apply_transform(self.transform, patch, map_items=False)
         return patch
@@ -167,11 +184,11 @@ class OurGridyDataset(IterableDataset):
             # Get mag level of file
             mag_level = get_mag_level(img_paths[0])
             
-            # Preprocessing - 1,10,256,256
-            arrays[0][7,:,:] = preprocess(arrays[0,7,:,:], mag_level, "C01")
-            arrays[0][8,:,:] = preprocess(arrays[0,8,:,:], mag_level, "C02")
-            arrays[0][9,:,:] = preprocess(arrays[0,9,:,:], mag_level, "C03")
-            arrays[0][:7,:,:] = preprocess(arrays[0,:7,:,:], mag_level, "C04")
+            # Preprocessing - 1,1,10,256,256
+            arrays[0,0,7,:,:] = preprocess(arrays[0,0,7,:,:], mag_level, "C01")
+            arrays[0,0,8,:,:] = preprocess(arrays[0,0,8,:,:], mag_level, "C02")
+            arrays[0,0,9,:,:] = preprocess(arrays[0,0,9,:,:], mag_level, "C03")
+            arrays[0,0,:7,:,:] = preprocess(arrays[0,0,:7,:,:], mag_level, "C04")
 
             iters = [iter_patch(a, self.patch_size, self.start_pos, False, self.mode) for a in arrays]
 

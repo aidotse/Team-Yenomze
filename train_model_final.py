@@ -27,23 +27,23 @@ from Discriminator import *
 
 
 if __name__ == '__main__':
-    num_epochs_G = 30
+    num_epochs_G = None
     num_epochs = 500
     batch_size = 32
 #     mode = "VGG"
-    adv_weight = 1e-2
+    adv_weight = 1e-1
     aug_prob = 50 
     data_dir = "/data/*"
-    load_weight_dir = None #"checkpoints/BESTTRAINING3/pretrained_G_epoch_20.pth"
-    save_weight_dir = "checkpoints/BESTTRAINING6"
-    log_dir = "logs/BESTTRAINING6"
-    loss_dir = "lossinfo/BESTTRAINING6"
+    load_weight_dir = "checkpoints/BESTTRAINING6/G_epoch_129.pth"
+    save_weight_dir = "checkpoints/BESTTRAINING6.5"
+    log_dir = "logs/BESTTRAINING6.5"
+    loss_dir = "lossinfo/BESTTRAINING6.5"
     lr = 1e-5
     
     # Hyperparameters - Loss
-    mse_loss_weight = 50
-    c01_weight = 0.4
-    c02_weight = 0.2
+    mse_loss_weight = 150
+    c01_weight = 0.5
+    c02_weight = 0.1
     c03_weight = 0.4
 
     if not os.path.exists(save_weight_dir):
