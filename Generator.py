@@ -15,9 +15,11 @@ class DoubleConv(nn.Module):
             mid_channels = out_channels
         self.double_conv = nn.Sequential(
             nn.Conv2d(in_channels, mid_channels, kernel_size=3, padding=1),
+            nn.Dropout2d(p=0.2),
             nn.BatchNorm2d(mid_channels),
             nn.LeakyReLU(0.1),
             nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1),
+            nn.Dropout2d(p=0.2),
             nn.BatchNorm2d(out_channels),
             nn.LeakyReLU(0.1)
         )
@@ -35,7 +37,6 @@ class Down(nn.Module):
         self.pool_conv = nn.Sequential(
             # nn.MaxPool2d(2),
             nn.AvgPool2d(kernel_size=3, stride=2),
-            nn.Dropout()
             DoubleConv(in_channels, out_channels)
         )
 
@@ -75,11 +76,14 @@ class OutConv(nn.Module):
         super(OutConv, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
         self.tanh = nn.Tanh()
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         x = self.conv(x)
-        x = self.tanh(x)
+        #x = self.tanh(x)
         #x = (1.0 + self.tanh(x))/2.0
+        x = self.sigmoid(x)
+        
         return x
 
 
@@ -92,25 +96,47 @@ class GeneratorUnet(nn.Module):
         factor = 2
 
         # self.inc = DoubleConv(1, 32)  # 1 or 3
-        self.inc1 = DoubleConv(1, 32)
-        self.inc2 = DoubleConv(1, 32)
-        self.inc3 = DoubleConv(1, 32)
-        self.inc4 = DoubleConv(1, 32)
-        self.inc5 = DoubleConv(1, 32)
-        self.inc6 = DoubleConv(1, 32)
-        self.inc7 = DoubleConv(1, 32)
+        # Real parameters
+#         self.inc1 = DoubleConv(1, 32)
+#         self.inc2 = DoubleConv(1, 32)
+#         self.inc3 = DoubleConv(1, 32)
+#         self.inc4 = DoubleConv(1, 32)
+#         self.inc5 = DoubleConv(1, 32)
+#         self.inc6 = DoubleConv(1, 32)
+#         self.inc7 = DoubleConv(1, 32)
         
-        self.down1 = Down(32*7, 64*7)
-        self.down2 = Down(64*7, 128*7)
-        self.down3 = Down(128*7, 256*7)
-        self.down4 = Down(256*7, 512*7 // factor)
-        self.up1 = Up(512*7, 256*7 // factor)
-        self.up2 = Up(256*7, 128*7 // factor)
-        self.up3 = Up(128*7, 64*7 // factor)
-        self.up4 = Up(64*7, 32*7)
-        self.outc1 = OutConv(32*7, 1)
-        self.outc2 = OutConv(32*7, 1)
-        self.outc3 = OutConv(32*7, 1)
+#         self.down1 = Down(32*7, 64*7)
+#         self.down2 = Down(64*7, 128*7)
+#         self.down3 = Down(128*7, 256*7)
+#         self.down4 = Down(256*7, 512*7 // factor)
+#         self.up1 = Up(512*7, 256*7 // factor)
+#         self.up2 = Up(256*7, 128*7 // factor)
+#         self.up3 = Up(128*7, 64*7 // factor)
+#         self.up4 = Up(64*7, 32*7)
+#         self.outc1 = OutConv(32*7, 1)
+#         self.outc2 = OutConv(32*7, 1)
+#         self.outc3 = OutConv(32*7, 1)
+        
+        # Tiny parameters
+        self.inc1 = DoubleConv(1, 16)
+        self.inc2 = DoubleConv(1, 16)
+        self.inc3 = DoubleConv(1, 16)
+        self.inc4 = DoubleConv(1, 16)
+        self.inc5 = DoubleConv(1, 16)
+        self.inc6 = DoubleConv(1, 16)
+        self.inc7 = DoubleConv(1, 16)
+        
+        self.down1 = Down(16*7, 32*7)
+        self.down2 = Down(32*7, 64*7)
+        self.down3 = Down(64*7, 128*7)
+        self.down4 = Down(128*7, 256*7 // factor)
+        self.up1 = Up(256*7, 128*7 // factor)
+        self.up2 = Up(128*7, 64*7 // factor)
+        self.up3 = Up(64*7, 32*7 // factor)
+        self.up4 = Up(32*7, 16*7)
+        self.outc1 = OutConv(16*7, 1)
+        self.outc2 = OutConv(16*7, 1)
+        self.outc3 = OutConv(16*7, 1)
 
     def forward(self, input1, input2, input3, input4, input5, input6, input7):
         # Idea of computing multi-input-multi-output from Ferdian et al (4DflowNET)

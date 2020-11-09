@@ -27,24 +27,24 @@ from Discriminator import *
 
 
 if __name__ == '__main__':
-    num_epochs_G = 20
-    num_epochs = 100
-    batch_size = 16
+    num_epochs_G = 30
+    num_epochs = 500
+    batch_size = 32
 #     mode = "VGG"
     adv_weight = 1e-2
-    aug_prob = 50
+    aug_prob = 50 
     data_dir = "/data/*"
-    load_weight_dir = None #"checkpoints/third_try_VGG/G_epoch_700.pth"
-    save_weight_dir = "checkpoints/BESTTRAINING3"
-    log_dir = "logs/BESTTRAINING3"
-    loss_dir = "lossinfo/BESTTRAINING3"
+    load_weight_dir = None #"checkpoints/BESTTRAINING3/pretrained_G_epoch_20.pth"
+    save_weight_dir = "checkpoints/BESTTRAINING6"
+    log_dir = "logs/BESTTRAINING6"
+    loss_dir = "lossinfo/BESTTRAINING6"
     lr = 1e-5
     
     # Hyperparameters - Loss
     mse_loss_weight = 50
     c01_weight = 0.4
-    c02_weight = 0.1
-    c03_weight = 0.5
+    c02_weight = 0.2
+    c03_weight = 0.4
 
     if not os.path.exists(save_weight_dir):
         os.makedirs(save_weight_dir)
@@ -84,7 +84,7 @@ if __name__ == '__main__':
     #             RandSpatialCrop(roi_size=256, random_size=False),
                 #CenterSpatialCrop(roi_size=2154),  # 2154
     #             RandScaleIntensity(factors=0.25, prob=aug_prob),
-                RandRotate(range_x=15, prob=aug_prob, keep_size=False),
+                RandRotate(range_x=15, prob=aug_prob, keep_size=True, padding_mode="reflection"),
                 RandRotate90(prob=aug_prob, spatial_axes=(1, 2)),
                 RandFlip(spatial_axis=(1, 2), prob=aug_prob),
                 ToTensor()
@@ -121,14 +121,14 @@ if __name__ == '__main__':
     training_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
-        shuffle=False
-        #num_workers=4 #multiprocessing.cpu_count(),
+        shuffle=False,
+        num_workers=8 #multiprocessing.cpu_count(),
     )
 
     validation_loader = DataLoader(
         val_dataset,
-        batch_size=batch_size
-        #num_workers=4 #multiprocessing.cpu_count(),
+        batch_size=batch_size,
+        num_workers=4 #multiprocessing.cpu_count(),
     )
 
     # load model / criterion / optimizer

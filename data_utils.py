@@ -26,17 +26,48 @@ def split_train_val(data_list, N_valid_per_magn=1):
     val_split = [data_list[i] for i in indexes]
     return train_split, val_split
 
+def get_mag_level(img_file_path):
+    if "20x" in img_file_path:
+        return "20x"
+    elif "40x" in img_file_path:
+        return "40x"
+    else:
+        return "60x"
+
 
 class MozartTheComposer(Compose):
     def __call__(self, input_):
         # read images
 #         vol = np.stack([self.transforms[0](x) for x in input_], axis=0)
         # apply magical mapping
-        vol = (np.log(1 + input_) - 5.5)/5.5
+        #vol = (np.log(1 + input_) - 5.5)/5.5
         # apply transforms
+        
+        # linear
+        #vol = input_/30000.0
+        
+        vol=input_
         for t in self.transforms:
             vol = t(vol)
         return vol
+    
+def preprocess(img, mag_level, channel):
+    std_dict = {"20x": {"C01": 515.0, "C02": 573.0, "C03": 254.0, "C04": 974.0}, 
+                "40x": {"C01": 474.0, "C02": 513.0, "C03": 146.0, "C04": 283.0}, 
+                "60x": {"C01": 379.0, "C02": 1010.0, "C03": 125.0, "C04": 228.0}}
+
+    threshold_99_dict = {"20x": {"C01": 5.47, "C02": 4.08, "C03": 5.95, "C04": 7.28}, 
+                         "40x": {"C01": 5.81, "C02": 3.97, "C03": 6.09, "C04": 7.16}, 
+                         "60x": {"C01": 5.75, "C02": 3.88, "C03": 6.27, "C04": 6.81}}
+    
+    max_log_value_dict = {"C01": 1.92, "C02": 1.63, "C03": 1.99, "C04": 2.12}
+
+    normalized_img = img/std_dict[mag_level][channel]
+    clipped_img = np.clip(normalized_img, None, threshold_99_dict[mag_level][channel])
+    log_transform_img = np.log(1 + clipped_img)
+    standardized_img = log_transform_img / max_log_value_dict[channel]
+    
+    return standardized_img
     
 
 class OurDataset(_TorchDataset):
@@ -70,6 +101,9 @@ class OurDataset(_TorchDataset):
         image_paths = self.data[image_id]        
         images = np.expand_dims(np.stack([self.image_reader(x) for x in image_paths]), axis=0)
         
+        # Get mag level of file
+        mag_level = get_mag_level(image_paths[0])
+        
         patches = self.sampler(images)
         
         if len(patches) != self.samples_per_image:
@@ -79,6 +113,12 @@ class OurDataset(_TorchDataset):
         patch_id = (index - image_id * self.samples_per_image) * (-1 if index < 0 else 1)
         patch = patches[patch_id]
         if self.transform is not None:
+            # Preprocessing - 1,10,256,256
+            patch[0][7,:,:] = preprocess(patch[0,7,:,:], mag_level, "C01")
+            patch[0][8,:,:] = preprocess(patch[0,8,:,:], mag_level, "C02")
+            patch[0][9,:,:] = preprocess(patch[0,9,:,:], mag_level, "C03")
+            patch[0][:7,:,:] = preprocess(patch[0,:7,:,:], mag_level, "C04")
+            
             patch = apply_transform(self.transform, patch, map_items=False)
         return patch
     
@@ -118,8 +158,20 @@ class OurGridyDataset(IterableDataset):
 
         for index in range(iter_start, iter_end):
             img_paths = self.data[index]
+
             arrays = np.expand_dims(np.stack([self.image_reader(x) for x in img_paths]), axis=(0,1))
-            arrays = (np.log(1 + arrays) - 5.5)/5.5
+            
+            #arrays = arrays / 30000.0
+            #arrays = (np.log(1 + arrays) - 5.5)/5.5
+            
+            # Get mag level of file
+            mag_level = get_mag_level(img_paths[0])
+            
+            # Preprocessing - 1,10,256,256
+            arrays[0][7,:,:] = preprocess(arrays[0,7,:,:], mag_level, "C01")
+            arrays[0][8,:,:] = preprocess(arrays[0,8,:,:], mag_level, "C02")
+            arrays[0][9,:,:] = preprocess(arrays[0,9,:,:], mag_level, "C03")
+            arrays[0][:7,:,:] = preprocess(arrays[0,:7,:,:], mag_level, "C04")
 
             iters = [iter_patch(a, self.patch_size, self.start_pos, False, self.mode) for a in arrays]
 
@@ -150,7 +202,18 @@ class OverlappyGridyDataset(IterableDataset):
         self.image_reader = LoadImage(data_reader, image_only=True)
         
         self.img = np.expand_dims(np.stack([self.image_reader(x) for x in self.data]), axis=0)
-        self.img = (np.log(1 + self.img) - 5.5)/5.5
+        
+        #self.img = self.img / 30000.0
+        #self.img = (np.log(1 + self.img) - 5.5)/5.5
+        
+        # Get mag level of file
+        self.mag_level = get_mag_level(self.data[0])
+            
+        # Preprocessing - 1,10,256,256
+        self.img[0][7,:,:] = preprocess(self.img[0,7,:,:], self.mag_level, "C01")
+        self.img[0][8,:,:] = preprocess(self.img[0,8,:,:], self.mag_level, "C02")
+        self.img[0][9,:,:] = preprocess(self.img[0,9,:,:], self.mag_level, "C03")
+        self.img[0][:7,:,:] = preprocess(self.img[0,:7,:,:], self.mag_level, "C04")
         
         self.img_h, self.img_w = self.img.shape[-2:]
         self.num_grids_h = math.ceil(self.img_h/self.nonoverlap_pix)
@@ -189,7 +252,7 @@ class OverlappyGridyDataset(IterableDataset):
                 slice_h_start = slice_h_end - self.patch_size
                 slice_w_start = slice_w_end - self.patch_size
 
-                img_merged[slice_h_start: slice_h_end, slice_w_start: slice_w_end] = img_merged[slice_h_start: slice_h_end, slice_w_start: slice_w_end] + patches[i].to('cpu').numpy()
+                img_merged[slice_h_start: slice_h_end, slice_w_start: slice_w_end] = img_merged[slice_h_start: slice_h_end, slice_w_start: slice_w_end] + patches[i].numpy()
                 num_pred_matrix[slice_h_start: slice_h_end, slice_w_start: slice_w_end] = num_pred_matrix[slice_h_start: slice_h_end, slice_w_start: slice_w_end] + 1.0
                 i += 1
 
