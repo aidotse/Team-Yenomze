@@ -91,8 +91,9 @@ class OutConv(nn.Module):
 
 
 class GeneratorUnet(nn.Module):
-    def __init__(self):
+    def __init__(self, split = False):
         super(GeneratorUnet, self).__init__()
+        self.split = split
         factor = 2
 
         # self.inc = DoubleConv(1, 32)  # 1 or 3
@@ -130,10 +131,18 @@ class GeneratorUnet(nn.Module):
         self.down2 = Down(32*7, 64*7)
         self.down3 = Down(64*7, 128*7)
         self.down4 = Down(128*7, 256*7 // factor)
+
         self.up1 = Up(256*7, 128*7 // factor)
         self.up2 = Up(128*7, 64*7 // factor)
         self.up3 = Up(64*7, 32*7 // factor)
-        self.up4 = Up(32*7, 16*7)
+        
+        if self.split:
+            self.up4_1 = Up(32*7, 16*7)
+            self.up4_2 = Up(32*7, 16*7)
+            self.up4_3 = Up(32*7, 16*7)
+        else:
+            self.up4 = Up(32*7, 16*7)
+            
         self.outc1 = OutConv(16*7, 1)
         self.outc2 = OutConv(16*7, 1)
         self.outc3 = OutConv(16*7, 1)
@@ -157,25 +166,25 @@ class GeneratorUnet(nn.Module):
         x_concat = torch.cat((inc1, inc2, inc3, inc4, inc5, inc6, inc7), dim=1)
 #         print('concat :' + str(x_concat.size()))
         x2 = self.down1(x_concat)
-#         print('x2 :' + str(x2.size()))
         x3 = self.down2(x2)
-#         print('x3 :' + str(x2.size()))
         x4 = self.down3(x3)
-#         print('x4 :' + str(x2.size()))
         x5 = self.down4(x4)
-#         print('x5 :' + str(x2.size()))
         x = self.up1(x5, x4)
-#         print('up1 :' + str(x.size()))
         x = self.up2(x, x3)
-#         print('up2 :' + str(x.size()))
         x = self.up3(x, x2)
-#         print('up3 :' + str(x.size()))
-        x = self.up4(x, x_concat)
-#         print('up4:' + str(x.size()))
-        # now multi ouput for 3 channels respectively
-        out1 = self.outc1(x)
-#         print('out1 :' + str(out1.size()))
-        out2 = self.outc2(x)
-        out3 = self.outc3(x)
+        if self.split:
+            semi_out1 = self.up4_1(x, x_concat)
+            semi_out2 = self.up4_2(x, x_concat)
+            semi_out3 = self.up4_3(x, x_concat)
+            
+            out1 = self.outc1(semi_out1)
+            out2 = self.outc2(semi_out2)
+            out3 = self.outc3(semi_out3)
+        else:
+            x = self.up4(x, x_concat)
+            # now multi ouput for 3 channels respectively
+            out1 = self.outc1(x)
+            out2 = self.outc2(x)
+            out3 = self.outc3(x)
 
         return out1, out2, out3

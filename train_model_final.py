@@ -29,21 +29,22 @@ from Discriminator import *
 if __name__ == '__main__':
     num_epochs_G = None
     num_epochs = 500
-    batch_size = 32
+    batch_size = 16
 #     mode = "VGG"
-    adv_weight = 1e-1
+    adv_weight = 5e-2
     aug_prob = 50 
     data_dir = "/data/*"
-    load_weight_dir = "checkpoints/BESTTRAINING6/G_epoch_129.pth"
-    save_weight_dir = "checkpoints/BESTTRAINING6.5"
-    log_dir = "logs/BESTTRAINING6.5"
-    loss_dir = "lossinfo/BESTTRAINING6.5"
+    load_weight_dir = "checkpoints/BESTTRAINING9/G_epoch_45.pth" # Based on min validation error
+    save_weight_dir = "checkpoints/BESTTRAINING9"
+    log_dir = "logs/BESTTRAINING9"
+    loss_dir = "lossinfo/BESTTRAINING9"
     lr = 1e-5
+    split_mode = True
     
     # Hyperparameters - Loss
-    mse_loss_weight = 150
-    c01_weight = 0.5
-    c02_weight = 0.1
+    mse_loss_weight = 50
+    c01_weight = 0.3
+    c02_weight = 0.3
     c03_weight = 0.4
 
     if not os.path.exists(save_weight_dir):
@@ -132,7 +133,7 @@ if __name__ == '__main__':
     )
 
     # load model / criterion / optimizer
-    netG = GeneratorUnet().to(device)
+    netG = GeneratorUnet(split=split_mode).to(device)
     # print(netG)
     netD = Discriminator().to(device)
 
