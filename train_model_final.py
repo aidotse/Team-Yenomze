@@ -33,13 +33,14 @@ if __name__ == '__main__':
 #     mode = "VGG"
     adv_weight = 5e-2
     aug_prob = 50 
-    data_dir = "/data/*"
-    load_weight_dir = "checkpoints/BESTTRAINING9/G_epoch_45.pth" # Based on min validation error
-    save_weight_dir = "checkpoints/BESTTRAINING9"
-    log_dir = "logs/BESTTRAINING9"
-    loss_dir = "lossinfo/BESTTRAINING9"
+    data_dir = "/data/40x*"
+    load_weight_dir = "checkpoints/BESTTRAINING9/G_epoch_58.pth" # Based on min validation error
+    save_weight_dir = "checkpoints/BESTTRAINING9_40x"
+    log_dir = "logs/BESTTRAINING9_40x"
+    loss_dir = "lossinfo/BESTTRAINING9_40x"
     lr = 1e-5
     split_mode = True
+    is_val_split = False
     
     # Hyperparameters - Loss
     mse_loss_weight = 50
@@ -74,7 +75,8 @@ if __name__ == '__main__':
     data_all_ch = list(zip(*all_data))
     
     train_split, val_split = split_train_val(data_all_ch, 
-                                             N_valid_per_magn=4)
+                                             N_valid_per_magn=4,
+                                             is_val_split = is_val_split)
 
     # data preprocessing/augmentation
     trans_train = MozartTheComposer(

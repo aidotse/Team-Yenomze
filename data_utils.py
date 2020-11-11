@@ -16,15 +16,21 @@ def find_first_occurance(tuple_list, target_str):
             return i
         
         
-def split_train_val(data_list, N_valid_per_magn=1):
+def split_train_val(data_list, N_valid_per_magn=1, is_val_split=True):
     indexes = [
         find_first_occurance(data_list, mag_lev)
-        for mag_lev in ["20x", "40x", "60x"]
+        for mag_lev in ["40x"]#["20x", "40x", "60x"]
     ]
     indexes = [i for initial in indexes for i in range(initial, initial+N_valid_per_magn)]
     train_split = [data_list[i] for i in range(len(data_list)) if i not in indexes]
     val_split = [data_list[i] for i in indexes]
-    return train_split, val_split
+    
+    if is_val_split:
+        return train_split, val_split
+    else:
+        return train_split + val_split, val_split
+    
+    
 
 def get_mag_level(img_file_path):
     if "20x" in img_file_path:
