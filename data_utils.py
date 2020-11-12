@@ -19,7 +19,7 @@ def find_first_occurance(tuple_list, target_str):
 def split_train_val(data_list, N_valid_per_magn=1, is_val_split=True):
     indexes = [
         find_first_occurance(data_list, mag_lev)
-        for mag_lev in ["40x"]#["20x", "40x", "60x"]
+        for mag_lev in ["60x"]#["20x", "40x", "60x"]
     ]
     indexes = [i for initial in indexes for i in range(initial, initial+N_valid_per_magn)]
     train_split = [data_list[i] for i in range(len(data_list)) if i not in indexes]
@@ -233,9 +233,11 @@ class OverlappyGridyDataset(IterableDataset):
         self.mag_level = get_mag_level(self.data[0])
             
         # Preprocessing - 1,10,256,256
-        self.img[0][7,:,:] = preprocess(self.img[0,7,:,:], self.mag_level, "C01")
-        self.img[0][8,:,:] = preprocess(self.img[0,8,:,:], self.mag_level, "C02")
-        self.img[0][9,:,:] = preprocess(self.img[0,9,:,:], self.mag_level, "C03")
+#         if not is_test:
+#             self.img[0][7,:,:] = preprocess(self.img[0,7,:,:], self.mag_level, "C01")
+#             self.img[0][8,:,:] = preprocess(self.img[0,8,:,:], self.mag_level, "C02")
+#             self.img[0][9,:,:] = preprocess(self.img[0,9,:,:], self.mag_level, "C03")
+        
         self.img[0][:7,:,:] = preprocess(self.img[0,:7,:,:], self.mag_level, "C04")
         
         self.img_h, self.img_w = self.img.shape[-2:]

@@ -134,9 +134,12 @@ class GeneratorUnet(nn.Module):
 
         self.up1 = Up(256*7, 128*7 // factor)
         self.up2 = Up(128*7, 64*7 // factor)
-        self.up3 = Up(64*7, 32*7 // factor)
+        self.up3 = Up(64*7, 32*7 // factor) 
         
         if self.split:
+            #self.up3_1 = Up(64*7, 32*7 // factor)
+            #self.up3_2 = Up(64*7, 32*7 // factor)
+            #self.up3_3 = Up(64*7, 32*7 // factor)
             self.up4_1 = Up(32*7, 16*7)
             self.up4_2 = Up(32*7, 16*7)
             self.up4_3 = Up(32*7, 16*7)
@@ -173,6 +176,10 @@ class GeneratorUnet(nn.Module):
         x = self.up2(x, x3)
         x = self.up3(x, x2)
         if self.split:
+            #ssemi_out1 = self.up3_1(x, x2)
+            #ssemi_out2 = self.up3_2(x, x2)
+            #ssemi_out3 = self.up3_3(x, x2)
+            
             semi_out1 = self.up4_1(x, x_concat)
             semi_out2 = self.up4_2(x, x_concat)
             semi_out3 = self.up4_3(x, x_concat)
