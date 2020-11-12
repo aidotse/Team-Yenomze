@@ -8,6 +8,6 @@ SRC_DIR=$YENOMZE_HOME/workspace
 docker run -t \
 	-v $DATA:/data \
 	-v $SRC_DIR:/workspace \
-	-p 3344:8888 \
+	-p 3322:8888 \
 	-p 1001:6006 \
 	yenomze:adipocyte nohup jupyter-lab --ip 0.0.0.0 > docker.log & 

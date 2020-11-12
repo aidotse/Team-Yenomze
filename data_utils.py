@@ -9,7 +9,6 @@ from typing import Any, Callable, Hashable, Optional, Sequence, Tuple, Union
 
 import math
 
-
 def find_first_occurance(tuple_list, target_str):
     for i, t in enumerate(tuple_list):
         if target_str in t[0]:

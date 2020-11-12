@@ -3,6 +3,9 @@ logs/
 checkpoints/
 lossinfo/
 output/
+test_images/
+*.png
+*.tif
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

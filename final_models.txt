@@ -1,0 +1,4 @@
+20X - epoch166  "BESTTRAINING9_20x/G_epoch_166.pth"
+40X - epoch125  "BESTTRAINING9_40x/G_epoch_125.pth"
+60X - epoch228  "BESTTRAINING9_60x/G_epoch_228.pth"
+
