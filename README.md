@@ -20,10 +20,16 @@ You can build the docker image by running the following command in **docker** di
 bash ./build.sh
 ```
 
-In order to run the image and start jupyter notebook automatically, run following bash script. You need to enter the docker to obtain the jupyter-notebook token to access the notebook after starting the docker. Jupyter-notebook output is directed to `/workspace/docker.log` file in the docker image. you can easily get the token by running `cat /workspace/nohup.out`.
+In order to run the image and start jupyter notebook automatically, run following bash script. You need to enter the docker to obtain the jupyter-notebook token to access the notebook after starting the docker. Jupyter-notebook output is directed to `/workspace/docker.log` file in the docker image. you can easily get the token by running `cat /workspace/nohup.out`. 
 
 ```
 bash ./run_docker_notebook.sh
+```
+
+Of course, you can start the docker in traditional ways as well :)
+
+```
+docker run -it -v /mnt/astra_data:/data -v /path/to/Team-Yenomze-repo:/workspace yenomze:adipocyte
 ```
 
 
