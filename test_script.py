@@ -3,12 +3,15 @@ import glob
 import torch
 import argparse
 
+import numpy as np
+from shutil import copyfile
+
 from TestHandler import TestHandler
 from data_utils import OverlappyGridyDataset
 from Generator import GeneratorUnet
 
 BEST_MODELS = {
-    "20x": "checkpoints/BESTTRAINING9_20x/G_epoch_166.pth",
+    "20x": "checkpoints/BESTTRAINING9_20x_resized/G_epoch_548.pth",
     "40x": "checkpoints/BESTTRAINING9_40x/G_epoch_125.pth",
     "60x": "checkpoints/BESTTRAINING9_60x/G_epoch_228.pth"
 }
@@ -37,6 +40,12 @@ def main():
         for i in range(1,8)
     ]
     inputs = list(zip(*inputs))
+    
+    # JUST FOR CONTRAST EXPERIMENTS TAKE 5 IMAGES FROM INPUTS!
+#    N = 5
+#    indexes = np.random.choice(np.arange(len(inputs)), N, replace=False)
+#    inputs = [inputs[i] for i in indexes]
+    # END OF THE EXPERIMENT SCRIPT
     
     # Load Model
     model = GeneratorUnet(split=True)

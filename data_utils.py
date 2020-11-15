@@ -4,6 +4,7 @@ from monai.transforms import Compose, Randomizable, apply_transform, LoadImage, 
 from monai.utils import NumpyPadMode
 from monai.data.utils import iter_patch
 import numpy as np
+import cv2
 
 from typing import Any, Callable, Hashable, Optional, Sequence, Tuple, Union
 
@@ -18,7 +19,7 @@ def find_first_occurance(tuple_list, target_str):
 def split_train_val(data_list, N_valid_per_magn=1, is_val_split=True):
     indexes = [
         find_first_occurance(data_list, mag_lev)
-        for mag_lev in ["60x"]#["20x", "40x", "60x"]
+        for mag_lev in ["20x"]#["20x", "40x", "60x"]
     ]
     indexes = [i for initial in indexes for i in range(initial, initial+N_valid_per_magn)]
     train_split = [data_list[i] for i in range(len(data_list)) if i not in indexes]
@@ -214,23 +215,32 @@ class OverlappyGridyDataset(IterableDataset):
         """
         self.patch_size = patch_size
         self.overlap_ratio = overlap_ratio
-        self.overlap_pix = int(overlap_ratio*patch_size)
-        self.nonoverlap_pix = int((1-overlap_ratio)*patch_size)
+        self.data = data
+        
+        # Get mag level of file
+        self.mag_level = get_mag_level(self.data[0])
+        
+        if self.mag_level == "20x":
+            self.sample_patch_size = self.patch_size // 2
+            self.resize=True
+        else:
+            self.sample_patch_size = self.patch_size
+            self.resize=False
+            
+        self.overlap_pix = int(overlap_ratio*self.sample_patch_size)
+        self.nonoverlap_pix = int((1-overlap_ratio)*self.sample_patch_size)
         
         self.start_pos = ()
         self.mode = NumpyPadMode.WRAP
         
-        self.data = data
+        
         self.image_reader = LoadImage(data_reader, image_only=True)
         
         self.img = np.expand_dims(np.stack([self.image_reader(x) for x in self.data]), axis=0)
         
         #self.img = self.img / 30000.0
         #self.img = (np.log(1 + self.img) - 5.5)/5.5
-        
-        # Get mag level of file
-        self.mag_level = get_mag_level(self.data[0])
-            
+
         # Preprocessing - 1,10,256,256
 #         if not is_test:
 #             self.img[0][7,:,:] = preprocess(self.img[0,7,:,:], self.mag_level, "C01")
@@ -257,6 +267,11 @@ class OverlappyGridyDataset(IterableDataset):
         i = 0
         for h in range(self.num_grids_h):
             for w in range(self.num_grids_w):
+                if self.resize:
+                    patch = cv2.resize(patches[i].numpy(), (self.sample_patch_size, self.sample_patch_size), interpolation = cv2.INTER_CUBIC)
+                else:
+                    patch = patches[i].numpy()
+                    
                 slice_h_start = 0
                 slice_w_start = 0
 
@@ -265,18 +280,18 @@ class OverlappyGridyDataset(IterableDataset):
                     slice_w_start = self.img_w
                 elif h == (self.num_grids_h-1):
                     slice_h_end = self.img_h
-                    slice_w_end = min(self.nonoverlap_pix*w + self.patch_size, self.img_w)
+                    slice_w_end = min(self.nonoverlap_pix*w + self.sample_patch_size, self.img_w)
                 elif w == (self.num_grids_w-1):
-                    slice_h_end = min(self.nonoverlap_pix*h + self.patch_size, self.img_h)
+                    slice_h_end = min(self.nonoverlap_pix*h + self.sample_patch_size, self.img_h)
                     slice_w_end = self.img_w
                 else:
-                    slice_h_end = min(self.nonoverlap_pix*h + self.patch_size, self.img_h)
-                    slice_w_end = min(self.nonoverlap_pix*w + self.patch_size, self.img_w)
+                    slice_h_end = min(self.nonoverlap_pix*h + self.sample_patch_size, self.img_h)
+                    slice_w_end = min(self.nonoverlap_pix*w + self.sample_patch_size, self.img_w)
 
-                slice_h_start = slice_h_end - self.patch_size
-                slice_w_start = slice_w_end - self.patch_size
+                slice_h_start = slice_h_end - self.sample_patch_size
+                slice_w_start = slice_w_end - self.sample_patch_size
 
-                img_merged[slice_h_start: slice_h_end, slice_w_start: slice_w_end] = img_merged[slice_h_start: slice_h_end, slice_w_start: slice_w_end] + patches[i].numpy()
+                img_merged[slice_h_start: slice_h_end, slice_w_start: slice_w_end] = img_merged[slice_h_start: slice_h_end, slice_w_start: slice_w_end] + patch
                 num_pred_matrix[slice_h_start: slice_h_end, slice_w_start: slice_w_end] = num_pred_matrix[slice_h_start: slice_h_end, slice_w_start: slice_w_end] + 1.0
                 i += 1
 
@@ -295,17 +310,26 @@ class OverlappyGridyDataset(IterableDataset):
                     slice_w_start = self.img_w
                 elif h == (self.num_grids_h-1):
                     slice_h_end = self.img_h
-                    slice_w_end = min(self.nonoverlap_pix*w + self.patch_size, self.img_w)
+                    slice_w_end = min(self.nonoverlap_pix*w + self.sample_patch_size, self.img_w)
                 elif w == (self.num_grids_w-1):
-                    slice_h_end = min(self.nonoverlap_pix*h + self.patch_size, self.img_h)
+                    slice_h_end = min(self.nonoverlap_pix*h + self.sample_patch_size, self.img_h)
                     slice_w_end = self.img_w
                 else:
-                    slice_h_end = min(self.nonoverlap_pix*h + self.patch_size, self.img_h)
-                    slice_w_end = min(self.nonoverlap_pix*w + self.patch_size, self.img_w)
+                    slice_h_end = min(self.nonoverlap_pix*h + self.sample_patch_size, self.img_h)
+                    slice_w_end = min(self.nonoverlap_pix*w + self.sample_patch_size, self.img_w)
 
-                slice_h_start = slice_h_end - self.patch_size
-                slice_w_start = slice_w_end - self.patch_size
+                slice_h_start = slice_h_end - self.sample_patch_size
+                slice_w_start = slice_w_end - self.sample_patch_size
 
                 img_patch = self.img[:, :, slice_h_start: slice_h_end, slice_w_start: slice_w_end]
+                
+                if self.resize:
+                    img_resized = []
+                    
+                    for i, img_patch_slice in enumerate(img_patch[0]):
+                        img_resized.append(cv2.resize(img_patch_slice, (self.patch_size, self.patch_size), interpolation = cv2.INTER_CUBIC))
+                    
+                    img_patch = np.expand_dims(np.stack(img_resized, axis=0), axis=0)
+                    
                 yield img_patch
                     

@@ -33,11 +33,11 @@ if __name__ == '__main__':
 #     mode = "VGG"
     adv_weight = 5e-2
     aug_prob = 50
-    data_dir = "/data/60x*" #"/data/*"
-    load_weight_dir = "checkpoints/BESTTRAINING9/G_epoch_204.pth" # Based on min validation error
-    save_weight_dir = "checkpoints/BESTTRAINING9_60x"
-    log_dir = "logs/BESTTRAINING9_60x"
-    loss_dir = "lossinfo/BESTTRAINING9_60x"
+    data_dir = "/data/20x*" #"/data/*"
+    load_weight_dir = "checkpoints/BESTTRAINING9_40x/G_epoch_125.pth" # Based on min validation error
+    save_weight_dir = "checkpoints/BESTTRAINING9_20x_resized"
+    log_dir = "logs/BESTTRAINING9_20x_resized"
+    loss_dir = "lossinfo/BESTTRAINING9_20x_resized"
     lr = 1e-5
     split_mode = True
     is_val_split = False
