@@ -10,9 +10,9 @@ from src.dataloader.TestDataset import OverlappyGridyDataset
 from src.model.Generator import GeneratorUnet
 
 BEST_MODELS = {
-    "20x": "checkpoints/BESTTRAINING9_20x_resized/G_epoch_548.pth",
-    "40x": "checkpoints/BESTTRAINING9_40x/G_epoch_125.pth",
-    "60x": "checkpoints/BESTTRAINING9_60x/G_epoch_228.pth"
+    "20x": "checkpoints/model20x/G_epoch_548.pth",
+    "40x": "checkpoints/model40x/G_epoch_125.pth",
+    "60x": "checkpoints/model60x/G_epoch_228.pth"
 }
 
 def parse_args():
