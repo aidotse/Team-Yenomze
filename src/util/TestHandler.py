@@ -4,10 +4,11 @@ import torch
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
-from Generator import GeneratorUnet
 from monai.data import PILReader, DataLoader
 
-from data_utils import postprocess
+from src.util.DataUtils import postprocess
+from src.model.Generator import GeneratorUnet
+
 
 class TestHandler():
     def __init__(self,
