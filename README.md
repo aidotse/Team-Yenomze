@@ -117,3 +117,32 @@ Example:
 ```
 python save_preds_as_png.py -n 5 -i output/20x -g /data/20x_images -o output/png
 ```
+
+
+## FILE STRUCTURE
+
+* **docker**
+    * *Dockerfile*
+    * *build.sh*
+    * *run_docker_notebook.sh*
+    * *requirements.txt*
+* **src**
+    * **dataloader**
+        * *TestDataset.py*
+        * *TrainDataset.py*
+        * *ValidationDataset.py*
+    * **loss**
+        * *VGGLoss.py*
+    * **model**
+        * *Discriminator.py*
+        * *Generator.py*
+    * **model_handler**
+        * *TestHandler.py*
+        * *TrainHandler.py*
+    * **util**
+        * *DataUtil.py*
+* **training_settings**
+    * *std_train_with_pretrain.json* 
+* *train.py*
+* *test.py*
+* *save_preds_as_png.py*
