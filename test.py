@@ -4,11 +4,10 @@ import torch
 import argparse
 
 import numpy as np
-from shutil import copyfile
 
-from TestHandler import TestHandler
-from data_utils import OverlappyGridyDataset
-from Generator import GeneratorUnet
+from src.model_handler.TestHandler import TestHandler
+from src.dataloader.TestDataset import OverlappyGridyDataset
+from src.model.Generator import GeneratorUnet
 
 BEST_MODELS = {
     "20x": "checkpoints/BESTTRAINING9_20x_resized/G_epoch_548.pth",
@@ -40,13 +39,7 @@ def main():
         for i in range(1,8)
     ]
     inputs = list(zip(*inputs))
-    
-    # JUST FOR CONTRAST EXPERIMENTS TAKE 5 IMAGES FROM INPUTS!
-#    N = 5
-#    indexes = np.random.choice(np.arange(len(inputs)), N, replace=False)
-#    inputs = [inputs[i] for i in indexes]
-    # END OF THE EXPERIMENT SCRIPT
-    
+        
     # Load Model
     model = GeneratorUnet(split=True)
     model_chkp_path = BEST_MODELS[args.magnification] if args.model_checkpoint is None else args.model_checkpoint

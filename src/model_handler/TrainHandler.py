@@ -1,4 +1,3 @@
-import argparse
 import os
 import sys
 import pandas as pd
@@ -8,6 +7,7 @@ import glob
 import multiprocessing
 
 import torch
+import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data
 from torch.utils.tensorboard import SummaryWriter
@@ -15,39 +15,36 @@ from torch import autograd
 
 from torchio.transforms import CropOrPad
 from monai.data import ArrayDataset, DataLoader, PILReader
-from monai.transforms import Compose, LoadImage, AddChannel, RandFlip, RandRotate, RandRotate90, RandScaleIntensity, CenterSpatialCrop, ToTensor, ScaleIntensity, LoadPNG, RandSpatialCrop
-from monai.visualize import plot_2d_or_3d_image
+from monai.transforms import Compose, LoadImage, RandFlip, RandRotate, RandRotate90, ToTensor
 
-import FlowPatchArrayDataset
+from src.dataloader.TrainDataset import OurDataset
+from src.dataloader.ValidationDataset import OurGridyDataset
+from src.loss.VGGLoss import VGGLoss
+from src.model.Discriminator import Discriminator
+from src.model.Generator import GeneratorUnet
+from src.util.DataUtils import (
+    split_train_val,
+    MozartTheComposer
+)
 
-from data_utils import *
-from VGGLoss import *
-from Generator import *
-from Discriminator import *
-
-
-if __name__ == '__main__':
-    num_epochs_G = None
-    num_epochs = 500
-    batch_size = 16
-#     mode = "VGG"
-    adv_weight = 5e-2
-    aug_prob = 50
-    data_dir = "/data/20x*" #"/data/*"
-    load_weight_dir = "checkpoints/BESTTRAINING9_40x/G_epoch_125.pth" # Based on min validation error
-    save_weight_dir = "checkpoints/BESTTRAINING9_20x_resized"
-    log_dir = "logs/BESTTRAINING9_20x_resized"
-    loss_dir = "lossinfo/BESTTRAINING9_20x_resized"
-    lr = 1e-5
-    split_mode = True
-    is_val_split = False
-    
-    # Hyperparameters - Loss
-    mse_loss_weight = 50
-    c01_weight = 0.3
-    c02_weight = 0.3
-    c03_weight = 0.4
-
+def start_training(batch_size=16, 
+                   num_epoch=500,
+                   num_epoch_pretrain_G=None,
+                   lr=1e-5,
+                   unet_split_mode=True,
+                   data_dir = "/data/*",
+                   load_weight_dir=None,
+                   save_weight_dir="./checkpoints/",
+                   log_dir="./logs/",
+                   loss_dir="./lossinfo/",
+                   augmentation_prob=50,
+                   adversarial_weight=5e-2,
+                   mse_loss_weight=50,
+                   c01_weight=0.3,
+                   c02_weight=0.3,
+                   c03_weight=0.4,
+                   is_val_split=False,
+                   ):
     if not os.path.exists(save_weight_dir):
         os.makedirs(save_weight_dir)
     if not os.path.exists(log_dir):
@@ -81,26 +78,15 @@ if __name__ == '__main__':
     # data preprocessing/augmentation
     trans_train = MozartTheComposer(
             [
-
-                #ScaleIntensity(),
-    #             AddChannel(),
-    #             RandSpatialCrop(roi_size=256, random_size=False),
-                #CenterSpatialCrop(roi_size=2154),  # 2154
-    #             RandScaleIntensity(factors=0.25, prob=aug_prob),
-                RandRotate(range_x=15, prob=aug_prob, keep_size=True, padding_mode="reflection"),
-                RandRotate90(prob=aug_prob, spatial_axes=(1, 2)),
-                RandFlip(spatial_axis=(1, 2), prob=aug_prob),
+                RandRotate(range_x=15, prob=augmentation_prob, keep_size=True, padding_mode="reflection"),
+                RandRotate90(prob=augmentation_prob, spatial_axes=(1, 2)),
+                RandFlip(spatial_axis=(1, 2), prob=augmentation_prob),
                 ToTensor()
             ]
         )
 
     trans_val = MozartTheComposer(
         [
-    #         LoadImage(PILReader(), image_only=True),
-            #ScaleIntensity(),
-    #         AddChannel(),
-    #         RandSpatialCrop(roi_size=256, random_size=False),
-            #CenterSpatialCrop(roi_size=2154),
             ToTensor()
         ]
     )
@@ -120,7 +106,6 @@ if __name__ == '__main__':
     )
 
     # now create data loader ( MONAI DataLoader)
-
     training_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
@@ -135,7 +120,7 @@ if __name__ == '__main__':
     )
 
     # load model / criterion / optimizer
-    netG = GeneratorUnet(split=split_mode).to(device)
+    netG = GeneratorUnet(split=unet_split_mode).to(device)
     # print(netG)
     netD = Discriminator().to(device)
 
@@ -147,7 +132,6 @@ if __name__ == '__main__':
     optimizerD = optim.Adam(netD.parameters(), lr=lr)
 
     # load weight if load_weight_dir is defined
-
     if load_weight_dir is not None:
         print(f'Loading checkpoint: {load_weight_dir}')
         checkpoint = torch.load(load_weight_dir)
@@ -158,11 +142,11 @@ if __name__ == '__main__':
     else:
         init_epoch = 0
 
-    if num_epochs_G is not None:
-        print(f'pre-training Generator for {num_epochs_G} epochs')
+    if num_epoch_pretrain_G is not None:
+        print(f'pre-training Generator for {num_epoch_pretrain_G} epochs')
         save_gene = pd.DataFrame(columns=['TotalLoss', 'lossC01', 'lossC02', 'lossC03'])
 
-        for epoch in range(1, num_epochs_G + 1):
+        for epoch in range(1, num_epoch_pretrain_G + 1):
             pretrainedG_losses = []
             lossC01s = []
             lossC02s = []
@@ -170,8 +154,7 @@ if __name__ == '__main__':
 
             netG.train()
             
-#             torch.Size([8, 1, 10, 256, 256])
-
+            # torch.Size([8, 1, 10, 256, 256])
             for batch_index, batch in enumerate(tqdm(training_loader, file=sys.stdout)):
                 inputZ01, inputZ02, inputZ03, inputZ04, inputZ05, inputZ06, inputZ07 = \
                     batch[:,:,0,:,:].to(device), \
@@ -184,9 +167,6 @@ if __name__ == '__main__':
                 targetC01, targetC02, targetC03 = batch[:,:,7,:,:].to(device), \
                     batch[:,:,8,:,:].to(device), \
                     batch[:,:,9,:,:].to(device)
-
-    #             print('input size :' + str(inputZ01.size()))
-    #             print('target size :' + str(targetC01.size()))
 
                 netG.zero_grad()
 
@@ -212,7 +192,7 @@ if __name__ == '__main__':
             epoch_lossC02 = np.array(lossC02s).mean()
             epoch_lossC03 = np.array(lossC03s).mean()
 
-            print(f'Pre-training Generator - Epoch {epoch}/{num_epochs_G} loss: {epoch_loss}, loss01: {epoch_lossC01}, loss02: {epoch_lossC02}, loss03: {epoch_lossC03}')
+            print(f'Pre-training Generator - Epoch {epoch}/{num_epoch_pretrain_G} loss: {epoch_loss}, loss01: {epoch_lossC01}, loss02: {epoch_lossC02}, loss03: {epoch_lossC03}')
             save_gene = save_gene.append({'TotalLoss': epoch_loss, 'lossC01': epoch_lossC01, 'lossC02': epoch_lossC02, 'lossC03': epoch_lossC03}, ignore_index=True)
             save_gene.to_csv(os.path.join(loss_dir, 'generator_loss_info.csv'))
             
@@ -233,9 +213,9 @@ if __name__ == '__main__':
                         'optimizer_state_dict': optimizerG.state_dict(),
                         'loss': epoch_loss}, os.path.join(save_weight_dir, weight))
                   
-    if num_epochs_G is not None:
+    if num_epoch_pretrain_G is not None:
         print(f'Loading weights from pretrained generator')
-        finalweight = f'pretrained_G_epoch_{num_epochs_G}.pth'
+        finalweight = f'pretrained_G_epoch_{num_epoch_pretrain_G}.pth'
         checkpoint = torch.load(os.path.join(save_weight_dir, finalweight))
         netG.load_state_dict(checkpoint['model_state_dict'])
         optimizerG.load_state_dict(checkpoint['optimizer_state_dict'])
@@ -245,23 +225,23 @@ if __name__ == '__main__':
         pass
 
 
-    if num_epochs_G is not None:
-        init_epoch = num_epochs_G + 1
-        num_epochs = num_epochs + num_epochs_G
+    if num_epoch_pretrain_G is not None:
+        init_epoch = num_epoch_pretrain_G + 1
+        num_epoch = num_epoch + num_epoch_pretrain_G
     else:
-        num_epochs = num_epochs
+        num_epoch = num_epoch
 
         if load_weight_dir is None:
             init_epoch = 1
         else:
             init_epoch = init_epoch
-            num_epochs = num_epochs + init_epoch
+            num_epoch = num_epoch + init_epoch
 
     save_gan_train = pd.DataFrame(columns=['TotalLoss', 'v_lossC01', 'v_lossC02', 'v_lossC03','m_lossC01', 'm_lossC02', 'm_lossC03', 'adv' ,'valTotalLoss',
                                            'val_v_lossC01', 'val_v_lossC02', 'val_v_lossC03','val_m_lossC01', 'val_m_lossC02', 'val_m_lossC03', 'val_adv'])
 
-    for epoch in range(init_epoch, num_epochs + 1):
-        print(f'Epoch : [{epoch} / {num_epochs}]')
+    for epoch in range(init_epoch, num_epoch + 1):
+        print(f'Epoch : [{epoch} / {num_epoch}]')
         netG.train()
         G_losses = []
         D_losses = []
@@ -304,13 +284,8 @@ if __name__ == '__main__':
             outputCs = torch.cat((outputC01, outputC02, outputC03), dim=1)
             fakeCs_prob = netD(outputCs)
 
-            # print(realC01_prob.size())
-            # print(real_label.size())
-
             d_loss_real = bceloss(realCs_prob, real_label)
-            #bceloss(realC01_prob, real_label) + bceloss(realC02_prob, real_label) + bceloss(realC03_prob, real_label)
             d_loss_fake = bceloss(fakeCs_prob, fake_label)
-            #bceloss(fakeC01_prob, fake_label) + bceloss(fakeC02_prob, fake_label) + bceloss(fakeC03_prob, fake_label)
 
             d_loss = d_loss_real + d_loss_fake
 
@@ -356,10 +331,7 @@ if __name__ == '__main__':
 
             adversarial_loss = bceloss(fakeCs_prob, real_label)
 
-            # adversarial_loss = bceloss(netD(outputC01), real_label) + bceloss(netD(outputC02), real_label) + bceloss(netD(outputC03), real_label)
-            # can try bce loss on bceloss(outputC1-3, targetC1-3)
-
-            g_loss = content_loss + adv_weight * adversarial_loss
+            g_loss = content_loss + adversarial_weight * adversarial_loss
             
 
             g_loss.backward()
@@ -378,12 +350,6 @@ if __name__ == '__main__':
             if batch_index % 10 == 0:
                 writer.add_scalar('Train/G_loss', g_loss.item(), epoch)
                 writer.add_scalar('Train/D_loss', d_loss.item(), epoch)
-                #plot_2d_or_3d_image(targetC01, epoch * len(training_loader) + batch_index, writer, index=0, tag="Groundtruth_train/C01")
-                #plot_2d_or_3d_image(targetC02, epoch * len(training_loader) + batch_index, writer, index=0, tag="Groundtruth_train/C01")
-                #plot_2d_or_3d_image(targetC03, epoch * len(training_loader) + batch_index, writer, index=0, tag="Groundtruth_train/C01")
-                #plot_2d_or_3d_image(outputC01, epoch * len(training_loader) + batch_index, writer, index=0, tag="Train/C01")
-                #plot_2d_or_3d_image(outputC02, epoch * len(training_loader) + batch_index, writer, index=0, tag="Train/C01")
-                #plot_2d_or_3d_image(outputC03, epoch * len(training_loader) + batch_index, writer, index=0, tag="Train/C01")
 
         
         if epoch % 1 == 0:
@@ -403,7 +369,7 @@ if __name__ == '__main__':
         epoch_m_lossC02 = np.array(m_lossC02s).mean()
         epoch_m_lossC03 = np.array(m_lossC03s).mean()
 
-        print(f'Epoch {epoch}/{num_epochs} Training g_loss : {G_loss}, d_loss : {D_loss}')
+        print(f'Epoch {epoch}/{num_epoch} Training g_loss : {G_loss}, d_loss : {D_loss}')
 
         ################################################################################################################
         # Validation
@@ -464,7 +430,7 @@ if __name__ == '__main__':
 
                 val_adversarial_loss = bceloss(fakeCs_prob, real_label)
 
-                val_g_loss = val_content_loss + adv_weight * val_adversarial_loss
+                val_g_loss = val_content_loss + adversarial_weight * val_adversarial_loss
 
                 val_G_losses.append(val_g_loss.detach().item())
                 val_v_lossC01s.append(val_v_lossC01.detach().item())
@@ -478,13 +444,6 @@ if __name__ == '__main__':
                 # log to tensorboard every 10 steps
                 if batch_index % 10 == 0:
                     writer.add_scalar('Val/G_loss', val_g_loss.item(), epoch)
-                    #plot_2d_or_3d_image(targetC01, epoch * len(training_loader) + batch_index, writer, index=0, tag="Groundtruth_val/C01")
-                    #plot_2d_or_3d_image(targetC02, epoch * len(training_loader) + batch_index, writer, index=0, tag="Groundtruth_val/C01")
-                    #plot_2d_or_3d_image(targetC03, epoch * len(training_loader) + batch_index, writer, index=0, tag="Groundtruth_val/C01")
-                    #plot_2d_or_3d_image(outputC01, epoch * len(training_loader) + batch_index, writer, index=0, tag="Val/C01")
-                    #plot_2d_or_3d_image(outputC02, epoch * len(training_loader) + batch_index, writer, index=0, tag="Val/C01")
-                    #plot_2d_or_3d_image(outputC03, epoch * len(training_loader) + batch_index, writer, index=0, tag="Val/C01")
-
         
         if epoch % 1 == 0:
             writer.add_images('Groundtruth_val/C01', targetC01, epoch)
@@ -510,7 +469,7 @@ if __name__ == '__main__':
             ignore_index=True)
         save_gan_train.to_csv(os.path.join(loss_dir, 'gan_train_loss_info.csv')) 
 
-        print(f'Epoch {epoch}/{num_epochs} Validation g_loss : {val_G_loss}')
+        print(f'Epoch {epoch}/{num_epoch} Validation g_loss : {val_G_loss}')
 
         # now save model parameter (from training)
         weight_g = f'G_epoch_{epoch}.pth'

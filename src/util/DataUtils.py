@@ -59,6 +59,20 @@ def preprocess(img, mag_level, channel):
     return standardized_img
 
 
+def adjust_intensity(img, mag_level, channel):
+    slope_dict = {"20x": {"C01": 1.0, "C02": 1.27, "C03": 1.1}, 
+                  "40x": {"C01": 1.0, "C02": 2.39, "C03": 1.7}, 
+                  "60x": {"C01": 1.0, "C02": 2.4, "C03": 0.8}}
+    
+    intercept_dict = {"20x": {"C01": 0.0, "C02": 14.0, "C03": 320.0}, 
+                      "40x": {"C01": 0.0, "C02": -427.0, "C03": 74.0}, 
+                      "60x": {"C01": 0.0, "C02": -887.0, "C03": 128.0}}
+    
+    adjusted_img = img * slope_dict[mag_level][channel] + intercept_dict[mag_level][channel]
+        
+    return adjusted_img
+
+
 def postprocess(img, mag_level, channel):
     std_dict = {"20x": {"C01": 515.0, "C02": 573.0, "C03": 254.0, "C04": 974.0}, 
                 "40x": {"C01": 474.0, "C02": 513.0, "C03": 146.0, "C04": 283.0}, 
@@ -74,4 +88,6 @@ def postprocess(img, mag_level, channel):
     normalized_img = np.exp(log_transform_img - 1)
     final_img = normalized_img * std_dict[mag_level][channel]
     
-    return final_img
+    final_adjusted_img = adjust_intensity(final_img, mag_level, channel)
+    
+    return final_adjusted_img

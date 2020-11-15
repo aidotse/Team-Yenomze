@@ -4,6 +4,8 @@ from monai.transforms import apply_transform, LoadImage, RandSpatialCropSamples
 
 from typing import Any, Callable, Hashable, Optional, Sequence, Tuple, Union
 
+from src.util.DataUtils import get_mag_level, preprocess
+
 class OurDataset(_TorchDataset):
     
     def __init__(self, 

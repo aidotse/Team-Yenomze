@@ -1,0 +1,19 @@
+{
+    "batch_size": 16, 
+    "num_epoch": 500,
+    "num_epoch_pretrain_G": 20,
+    "lr": 0.00001,
+    "unet_split_mode": true,
+    "data_dir" :  "/data/*",
+    "load_weight_dir": null,
+    "save_weight_dir": "checkpoints/standard_training",
+    "log_dir": "logs/standard_training",
+    "loss_dir": "./lossinfo/standard_training",
+    "augmentation_prob": 50,
+    "adversarial_weight": 0.05,
+    "mse_loss_weight": 50,
+    "c01_weight": 0.3,
+    "c02_weight": 0.3,
+    "c03_weight": 0.4,
+    "is_val_split": false    
+}
